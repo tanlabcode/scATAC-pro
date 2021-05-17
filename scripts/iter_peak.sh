@@ -16,7 +16,7 @@ mtx_bin_dir=${mtx_dir}/${PEAK_CALLER}
 mkdir -p $mtx_bin_dir
 bin_file=${mtx_bin_dir}/${OUTPUT_PREFIX}_bin.bed
 ${BEDTOOLS_PATH}/bedtools makewindows -g $CHROM_SIZE_FILE -w $BIN_RESL > $bin_file
-${R_PATH}/R --vanilla --args ${OUTPUT_DIR}/summary/${OUTPUT_PREFIX}.fragments.txt $bin_file ${mtx_bin_dir} 1000 50 < ${curr_dir}/src/get_mtx.R
+${R_PATH}/R --vanilla --args ${OUTPUT_DIR}/summary/${OUTPUT_PREFIX}.fragments.tsv.gz $bin_file ${mtx_bin_dir} 1000 50 < ${curr_dir}/src/get_mtx.R
 rm $bin_file
 
 
@@ -29,11 +29,11 @@ ${R_PATH}/Rscript --vanilla ${curr_dir}/src/clustering.R ${mtx_bin_dir}/matrix.m
 
 
 ## remove cluster with less than 100 cells
-${R_PATH}/Rscript --vanilla ${curr_dir}/src/rm_minor_cluster.R ${output_dir}/cell_cluster_table.txt 100
+${R_PATH}/Rscript --vanilla ${curr_dir}/src/rm_minor_cluster.R ${output_dir}/cell_cluster_table.tsv 100
 
 ## 3.call peaks per cluster by macs2
 ## split bam into cluster, get sam file
-${PERL_PATH}/perl ${curr_dir}/src/split_bam2clusters0.pl --cluster_file ${output_dir}/filtered_cell_cluster_table.txt --bam_file $input_bam \
+${PERL_PATH}/perl ${curr_dir}/src/split_bam2clusters0.pl --cluster_file ${output_dir}/filtered_cell_cluster_table.tsv --bam_file $input_bam \
     --output_dir $output_dir --samtools_path $SAMTOOLS_PATH
 
 

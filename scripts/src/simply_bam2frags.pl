@@ -10,6 +10,7 @@ use Getopt::Long;
 my $samtools_path; 
 my $read_file;
 my $output_file;
+my $output_len_file;
 
 GetOptions( 'read_file=s' => \$read_file  
           , 'output_file=s' => \$output_file 
@@ -32,6 +33,10 @@ if($read_file_suffix ne ".bam")
 open(READ, "$samtools_path/samtools view $read_file |" ) or die("Cannot read $read_file \n");
 open(OUT, ">$output_file" ) or die("Cannot write $output_file \n");
 
+# save the fragment length into a file for calculating insert size
+$output_len_file = $output_file.".len";
+
+open(OUT_Len, ">$output_len_file" ) or die("Cannot write $output_len_file \n");
 
 print("Now I am starting to process read file: $read_file .\n");
 print "...\n";
@@ -47,24 +52,35 @@ while(<READ>)
 {
    $read_file_counter++;
 
-	   chomp;
-	   my $chrom = "XXXXXX";
+	 chomp;
+	 my $chrom = "XXXXXX";
      my $start = "XXXXXX";
      my $end = "XXXXXX";
+     my $len = "XXXXXX";
+     my $mate = "XXXXXX";
      my $barcode = "XXXXXX";
      my $isSameChr = "XXXXXX";
-	   my @array = split /\t/;
-	   $chrom = $array[2];
-	   $start = $array[3] - 4;
-	   $end = $array[7] + 5;
-	   $isSameChr = $array[6];
-    
-    ## only keep one read per pair
-     if($end < $start){
+
+	 my @array = split /\t/;
+     $len = $array[8];
+     ## only keep one read per pair
+     if($len <= 0){
       next;  
      }
+     print OUT_Len $len."\n" ; ## save all fragment length
+     
+     $chrom = $array[2];
+     ## add 4 and 5bps to the left and right to adjust the TN5 occupancy
+     $start = $array[3] - 4;
+     $mate = $array[7] - 4; ## what is position of the mate read
+     $end = $len + $start + 5 + 4;
+     $isSameChr = $array[6];
+    
      if($isSameChr !~ "="){
-      next;  
+        next;  
+     }
+     if($start == $mate){
+        next;  
      }
 
 
@@ -86,7 +102,8 @@ while(<READ>)
   
 }#while(<READ>)
 
-
+close OUT_Len;
+close READ;
 print("I have read $read_file_counter reads from input read file: $read_file .\n");
 
 
@@ -94,12 +111,13 @@ print("Now I am writing the output to $output_file .\n");
 
 
 
-foreach my $frag_id (sort keys %frags)
+#foreach my $frag_id (sort keys %frags)
+foreach my $frag_id (keys %frags)
 {
 
    print OUT $frag_id."\t".$frags{$frag_id}."\n" ;
 }
-
+close OUT;
 my $etime = time;
 my $elapsed = $etime - $btime;
 

@@ -1,14 +1,14 @@
 ## install R packages for scATAC-pro
 
 if(!require(BiocManager)){
-    install.packages('BiocManager')
+    install.packages('BiocManager', dependencies = TRUE, repos = "http://cran.us.r-project.org")
 }
-if(packageVersion("BiocManager")<"1.30.10")
-    install.packages('BiocManager')
+if(packageVersion("BiocManager")<"1.30.10"){
+    install.packages('BiocManager', dependencies = TRUE, repos = "http://cran.us.r-project.org")
 }
 
 pks = c('devtools', 'flexdashboard', 'png', 'data.table', 'Matirx', 'Rcpp', 'ggplot2', 'flexmix',
-  'optparse', 'magrittr', 'readr', 'Seurat', 'bedr', 'gridExtra', 'ggrepel', 'kableExtra', 'viridis', 'writexl', 'xlsx', 'mefa4')
+  'optparse', 'magrittr', 'readr', 'Seurat', 'bedr', 'gridExtra', 'ggrepel', 'kableExtra', 'viridis', 'writexl', 'xlsx', 'mefa4', 'mclust')
 
 for(pk in pks){
     if(!require(pk, character.only = T)) {

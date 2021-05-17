@@ -19,8 +19,17 @@ norm_by = args[7]
 REDUCTION = args[8]
 nREDUCTION = as.integer(args[9])
 top_variable_features = as.numeric(args[10])
+qc_stat_file = args[11]
 
-mtx = read_mtx_scATACpro(mtx_file)
+if(grepl(mtx_file, pattern = '.rds', fix = T)) {
+    mtx = readRDS(mtx_file)
+    rnames = rownames(mtx)
+    new.rnames = sapply(rnames, function(x) gsub('_', '-', x))
+    names(new.rnames) = NULL
+    rownames(mtx) <- new.rnames
+}else{
+    mtx = read_mtx_scATACpro(mtx_file)
+}
 
 tss_ann <- fread(tss_path, header = F)
 #names(tss_ann)[c(1:4,7)] <- c('chr', 'start', 'end', 'gene_name', 'gene_type')
@@ -37,6 +46,21 @@ mtx = mtx[, cfreqs > 0]
 
 seurat.obj = runSeurat_Atac(mtx, npc = nREDUCTION, norm_by = norm_by, 
                                top_variable_features = top_variable_features, reg.var = 'nCount_ATAC')
+
+## add qc stat to each cell
+qc_singlecell = fread(qc_stat_file)
+qc_singlecell = qc_singlecell[bc %in% colnames(seurat.obj)]
+qc_singlecell = data.frame(qc_singlecell)
+rownames(qc_singlecell) = qc_singlecell$bc
+qc_singlecell$bc = NULL
+names(qc_singlecell) =  c("total.unique.frags", "frac.mito",  "frac.peak",
+                         "frac.promoter", "frac.tss", "frac.enhancer", "tss_enrich_score")
+seurat.obj <- AddMetaData(seurat.obj, metadata = qc_singlecell)
+
+
+
+
+
 if(REDUCTION != 'lda'){
     seurat.obj = RunTSNE(seurat.obj, dims = 1:nREDUCTION, reduction = 'pca', check_duplicates = FALSE)
     seurat.obj = RunUMAP(seurat.obj, dims = 1:nREDUCTION, reduction = 'pca', verbose = F)
@@ -54,14 +78,20 @@ if(cluster_method == 'seurat'){
   if (toupper(k) == 'NULL' || k == '0'){
     resl = 0.2
   }else{
-   k = as.integer(k)
-    resl = queryResolution4Seurat(seurat.obj, reduction = 'pca', npc = nREDUCTION, k = k,
-                                min_resl = 0.01)
+    k = as.numeric(k)
+    ki = as.integer(k)
+    if(k >= 2 & k == ki) {
+        resl = queryResolution4Seurat(seurat.obj, reduction = 'pca', npc = nREDUCTION, k = ki,
+                            min_resl = 0.01)
+    }else{
+        resl = k
+    }
   }
   seurat.obj = FindClusters(seurat.obj, resolution = resl)
   seurat.obj$active_clusters = seurat.obj$seurat_clusters
 }
 
+k = as.integer(k)
 
 if(grepl(REDUCTION, pattern = 'lda', ignore.case = T)){
     
@@ -133,7 +163,7 @@ saveRDS(seurat.obj, file = paste0(output_dir, '/seurat_obj.rds'))
 bc_cls = data.table('Barcode' = rownames(seurat.obj@meta.data), 'Cluster' = seurat.obj@meta.data$active_clusters)
 setkey(bc_cls, Cluster)
 
-write.table(bc_cls, file = paste0(output_dir, '/cell_cluster_table.txt'), sep = '\t',
+write.table(bc_cls, file = paste0(output_dir, '/cell_cluster_table.tsv'), sep = '\t',
             quote = F, row.names = F)
 
 cg <- DimPlot(seurat.obj, reduction = 'umap', group.by = 'active_clusters', label = T) + theme(legend.text = element_text(size = 17))

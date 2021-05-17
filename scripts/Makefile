@@ -279,18 +279,18 @@ integrate: config_check
 integrate_seu: config_check
 	@echo "--------------------------------------------" 
 	@date 
-	@echo "Doing integrating mtx by seurat ..." 
-	@$(SCRIPTS)/integrate_seu.sh $(INPUT_FILE) $(CONFIG_FILE) $(CONFIG_SYS)
+	@echo "Integrating matrices ..." 
+	@$(SCRIPTS)/integrate_mtx.sh $(INPUT_FILE) $(CONFIG_FILE) $(CONFIG_SYS)
 	@echo 
 
 #######################################
-## call_cnv
+## integrate_mtx
 #######################################
-call_cnv: config_check
+integrate_mtx: config_check
 	@echo "--------------------------------------------" 
 	@date 
-	@echo "Calling CNV ..." 
-	@$(SCRIPTS)/call_cvn.sh $(INPUT_FILE) $(CONFIG_FILE) $(CONFIG_SYS)
+	@echo "Integrating matrices ..." 
+	@$(SCRIPTS)/integrate_mtx.sh $(INPUT_FILE) $(CONFIG_FILE) $(CONFIG_SYS)
 	@echo 
 
 #######################################
@@ -341,6 +341,16 @@ visualize: config_check
 	@date 
 	@echo "interactively visualize ..." 
 	@$(SCRIPTS)/visualize.sh $(INPUT_FILE) $(CONFIG_FILE) $(CONFIG_SYS)
+	@echo 
+
+#######################################
+## addCB2bam
+#######################################
+addCB2bam: config_check
+	@echo "--------------------------------------------" 
+	@date 
+	@echo "add CB tag to bam file ..." 
+	@$(SCRIPTS)/addCB2bam.sh $(INPUT_FILE) $(CONFIG_FILE) $(CONFIG_SYS)
 	@echo 
 
 #######################################

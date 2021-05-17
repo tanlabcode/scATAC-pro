@@ -309,8 +309,8 @@ if [ $wasInstalled == 0 ]; then
     cd bedtools2
     make
     cd ..
-    cp -r bedtools2 $PREFIX_BIN/
-    export PATH=$PREFIX_BIN/bedtools2/bin:$PATH
+    cp -r bedtools2 ${PREFIX_BIN}/
+    export PATH=${PREFIX_BIN}/bedtools2/bin:$PATH
 
     check=`bedtools | grep -i options`;
     if [ $? = "0" ]; then
@@ -321,6 +321,56 @@ if [ $wasInstalled == 0 ]; then
         echo -e "$RED""bedtools NOT installed successfully""$NORMAL"; exit 1;
     fi
 fi
+
+##install bedops for bedr
+wasInstalled=0;
+which bedops > /dev/null 2>&1
+if [ $? = "0" ]; then
+    echo -e "$BLUE""bedops appears to be already installed. ""$NORMAL"
+    wasInstalled=1;
+else
+    echo "Installing bedops ..."
+    $get bedops_linux_x86_64-v2.4.39.tar.bz2 https://github.com/bedops/bedops/releases/download/v2.4.39/bedops_linux_x86_64-v2.4.39.tar.bz2
+    mkdir -p ${PREFIX_BIN}/bedops
+    tar jxvf bedops_linux_x86_64-v2.4.39.tar.bz2 -C ${PREFIX_BIN}/bedops 
+    export PATH=${PREFIX_BIN}/bedops/bin:$PATH
+    check=`which bedops`;
+    if [ $? = "0" ]; then
+        echo -e "$BLUE""bedops appears to be installed successfully""$NORMAL"
+        echo -e export PATH=$PREFIX_BIN/bedops/bin:"\$"PATH >> ~/.bashrc
+    else
+        echo -e "$RED""bedops NOT installed successfully""$NORMAL"; exit 1;
+    fi
+    wasInstalled=1 
+fi
+
+##install tabix
+wasInstalled=0;
+which tabix > /dev/null 2>&1
+if [ $? = "0" ]; then
+    echo -e "$BLUE""tabix appears to be already installed. ""$NORMAL"
+    wasInstalled=1;
+else
+    echo "Installing tabix ..."
+    git clone https://github.com/samtools/tabix
+    cd tabix
+    make
+    export PATH=tabix:$PATH
+    cd ..     
+    cp -r tabix ${PREFIX_BIN}/
+    check=`which tabix`
+    if [ $? = "0" ]; then
+        echo -e "$BLUE""tabix appears to be installed successfully""$NORMAL"
+        echo -e export PATH=$PREFIX_BIN/tabix:"\$"PATH >> ~/.bashrc
+        TABIX_PATH=$PREFIX_BIN/tabix
+    else
+        echo -e "$RED""tabix NOT installed successfully""$NORMAL"; exit 1;
+    fi
+    wasInstalled=1 
+fi
+
+##install tabix
+
 
 
 #########################################################################################
@@ -435,6 +485,7 @@ if [ $wasInstalled == 0 ]; then
             conda install cutadapt -y --channel bioconda
         else
             pip install --user --upgrade cutadapt
+            export PATH=~/.local/bin:$PATH
         fi
     fi
 
@@ -498,79 +549,13 @@ wasInstalled=0
 ##########################
 which rgt-hint > /dev/null 2>&1
 if [ $? != "0" ]; then
-    echo -e "$RED""rgt not installed..."
-    echo -e -n "Do you want to install RGT for footprinting analysis (it will take a while to install it) ? (y/n) [n] : " "$NORMAL"
-    read ans
-    if [ XX${ans} = XXy ]; then
-    
-        unset PYTHONPATH
-        unset PYTHONHOME
-        echo -e "$RED""OK, trying to install it through conda...""$NORMAL"
-        which conda > /dev/null 2>&1
-        if [ $? != "0" ]; then
-            echo "Install miniconda3:"
-                if [ "$os" = "Darwin" ]; then
-                    $get tmp.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh 
-                else
-                    $get tmp.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh 
-                fi
-                bash tmp.sh -b -f -p $PREFIX_BIN/conda3
-                conda_path=$PREFIX_BIN/conda3/bin
-                export PATH=$conda_path:$PATH
-                conda init bash
-                source ~/.bashrc
-        else
-            conda_path=$(dirname `which conda`)
-            pver=`conda --version 2>&1 | cut -d" " -f2`
-            vercomp $pver "4.7.0"
-            if [[ $? == 2 ]]; then
-                echo -e "$RED""conda v4.7.0 or higher is needed [$pver detected], I will updated it now...""$NORMAL"
-
-                if [ "$os" = "Darwin" ]; then
-                    $get tmp.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh 
-                else
-                    $get tmp.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh 
-                fi
-                bash tmp.sh -b -f -p $PREFIX_BIN/conda3
-                conda_path=$PREFIX_BIN/conda3/bin
-                export PATH=$conda_path:$PATH
-                 
-                conda init bash
-                source ~/.bashrc
-            fi
-       fi
-        unset PYTHONPATH
-        unset PYTHONHOME
-        ${conda_path}/conda --help > /dev/null 2>&1
-        if [ $? != "0" ]; then
-            "Cannot install Miniconda3, please install it manually!"
-        else
-            
-            conda create -y --name py2 python=2.7
-            conda activate py2
-            pip install --upgrade pip
-            pip install pytz pyparsing subprocess32
-            pip install python-dateutil==2.5.0
-            pip install --upgrade cython scipy numpy
-            pip install --upgrade RGT 
-        
-            HINT_PATH=$(dirname `which rgt-hint`)
-            if [ $? != '0' ]; then
-                echo -e  "$RED"" I cannot install RGT (for footprint analysis), please install it manually! ].""$NORMAL"
-                exit 
-            fi
-            #echo "install dependent data for rgt, this will take a while"
-            #cd ~/rgtdata
-            #python setupGenomicData.py --mm9
-            #python setupGenomicData.py --mm10
-            #python setupGenomicData.py --hg19
-            #python setupGenomicData.py --hg38
-            #conda deactivate 
-            #conda deactivate
-      fi
-    fi
+    echo -e "$RED""rgt not detected, trying install it now..."
+    pip install --user cython numpy scipy
+    pip install --user RGT
+    export PATH=~/.local/bin:$PATH
+    HINT_PATH=$(dirname `which rgt-hint`)
 else
-        HINT_PATH=$(dirname `which rgt-hint`)
+    HINT_PATH=$(dirname `which rgt-hint`)
 fi
 
 ##check whether hint is installed correctly
@@ -639,6 +624,14 @@ else
     echo "BEDTOOLS_PATH not found." 
 fi
 
+which tabix > /dev/null 2>&1
+if [ $? = "0" ]; then
+    echo "TABIX_PATH = "`dirname $(which tabix)` >> configure_system.txt
+elif [[ -d $TABIX_PATH ]]; then
+    echo -e "TABIX_PATH = " $TABIX_PATH >> configure_system.txt
+else
+    echo "TABIX_PATH not found." 
+fi
 
 which bwa > /dev/null 2>&1
 if [ $? = "0" ]; then
@@ -668,6 +661,7 @@ fi
 
 which trim_galore > /dev/null 2>&1
 if [ $? = "0" ]; then
+    echo "CUTADAPT_PATH = "`dirname $(which cutadapt)` >> configure_system.txt
     echo "TRIM_GALORE_PATH = "`dirname $(which trim_galore)` >> configure_system.txt
 fi
 

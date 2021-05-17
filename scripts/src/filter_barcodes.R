@@ -44,6 +44,9 @@ parser <- add_option(parser, c("-p", "--min_frac_promoter"), type="double", defa
 parser <- add_option(parser, c("-m", "--max_frac_mito"), type="double", default=0.2,
                      help="maximal fraction of total pairs in Mitocondrial per barcode [default %default]",
                      metavar="number")
+parser <- add_option(parser, c("-s", "--min_tss_escore"), type="double", default=0,
+                     help="minimal tss enrich score per barcode [default %default]",
+                     metavar="number")
 
 opt = parse_args(parser)
 
@@ -59,22 +62,32 @@ cut.peak = opt$min_frac_peak
 cut.tss = opt$min_frac_tss
 cut.promoter = opt$min_frac_promoter
 cut.enh = opt$min_frac_enhancer
+cut.tss.escore = opt$min_tss_escore
 
 qc_sele = qc_bc_stat[total_frags >= cut.min.frag & total_frags <= cut.max.frag &
                        frac_mito <= cut.mito &
                        frac_peak >= cut.peak &
                        frac_tss >= cut.tss &
                        frac_promoter >= cut.promoter &
-                       frac_enhancer >= cut.enh]
-
-mtx = readMM(mtx_file)
-input_mtx_dir = dirname(mtx_file)
-colnames(mtx) = fread(paste0(input_mtx_dir, '/barcodes.txt'), header = F)$V1
-mtx = mtx[, colnames(mtx) %in% qc_sele$bc]
-
-mtx.dir = dirname(mtx_file)
+                       frac_enhancer >= cut.enh &
+                       tss_enrich_score >= cut.tss.escore]
+if(grepl(mtx_file, pattern = '.rds', fixed = T)){
+    mtx = readRDS(mtx_file)
+}else{
+    mtx = readMM(mtx_file)
+    input_mtx_dir = dirname(mtx_file)
+    colnames(mtx) = fread(paste0(input_mtx_dir, '/barcodes.txt'), header = F)$V1
+    mtx.dir = dirname(mtx_file)
+    ff = fread(paste0(mtx.dir, '/features.txt'), header = F)$V1
+    rownames(mtx) <- ff
+}
+mtx = mtx[, colnames(mtx) %in% qc_sele$bc, drop = F]
 system(paste('mkdir -p', output_dir))
+
+
 writeMM(mtx, file = paste0(output_dir, '/matrix.mtx'))
+saveRDS(mtx, file = paste0(output_dir, '/matrix.rds'))
+
 write.table(colnames(mtx), file = paste0(output_dir, '/barcodes.txt'), 
             sep = '\t', row.names = F, quote = F, col.names = F)
 system(paste0('cp ', dirname(mtx_file), '/features.txt ', output_dir, '/features.txt'))
