@@ -13,8 +13,17 @@ output_dir=${OUTPUT_DIR}/summary
 mkdir -p $output_dir
 
 ncore=$(nproc --all)
-ncore=$(($ncore - 1))
+ncore=$(($ncore - 4))
+if [[ $ncore -gt 30 ]]; then
+    ncore=30
+elif [[ $ncore -lt 1 ]]; then
+    ncore=1
+fi
 
+flag0=0x2
+if [ ${isSingleEnd} = 'TRUE' ]; then
+    flag0=0x1
+fi
 input_pre=${input_dir}/cell_barcodes
 output_pre=${output_dir}/cell_barcodes
 
@@ -22,7 +31,7 @@ ${SAMTOOLS_PATH}/samtools flagstat -@ $ncore ${input_pre}.bam > ${output_pre}.fl
 ${SAMTOOLS_PATH}/samtools idxstats -@ $ncore ${input_pre}.bam > ${output_pre}.idxstat.txt
 
 if [[ ! -f ${input_pre}.MAPQ${MAPQ}.bam ]];then
-	${SAMTOOLS_PATH}/samtools view -@ $ncore -h -b -q ${MAPQ} ${input_pre}.bam > ${input_pre}.MAPQ${MAPQ}.bam
+	${SAMTOOLS_PATH}/samtools view -@ $ncore -f $flag0 -h -b -q ${MAPQ} ${input_pre}.bam > ${input_pre}.MAPQ${MAPQ}.bam
 fi
 
 if [[ ! -f ${input_pre}.MAPQ${MAPQ}.bam.bai ]];then
@@ -32,19 +41,22 @@ fi
 ${SAMTOOLS_PATH}/samtools flagstat -@ $ncore ${input_pre}.MAPQ${MAPQ}.bam > ${output_pre}.MAPQ${MAPQ}.flagstat.txt
 ${SAMTOOLS_PATH}/samtools idxstats -@ $ncore ${input_pre}.MAPQ${MAPQ}.bam > ${output_pre}.MAPQ${MAPQ}.idxstat.txt
 
-
 tmp_sam_file=${output_dir}/tmp.sam
-${SAMTOOLS_PATH}/samtools view -@ $ncore -q 5 -f 0x2 ${input_pre}.bam > $tmp_sam_file
+tmp_bam_file=${output_dir}/tmp.bam
 
-if [ $MAPPING_METHOD == 'bwa' ]; then
-   total_uniq_mapped=$( wc -l ${tmp_sam_file} | cut -d ' ' -f1 )  ## number of unique mapped reads
-elif [ $MAPPING_METHOD == 'bowtie' ]; then
-   total_uniq_mapped=$( grep -E "@|NM:" $tmp_sam_file | grep -v "XS:" | wc -l )
-else 
-   total_uniq_mapped=$( grep -E "@|NM:" $tmp_sam_file | grep -v "XS:" | wc -l )
+
+if [[ $MAPPING_METHOD == bwa ]]; then
+    #${SAMTOOLS_PATH}/samtools view -@ $ncore -q 5 -f $flag0 -b ${input_pre}.bam > $tmp_bam_file
+    #total_uniq_mapped=$( ${SAMTOOLS_PATH}/samtools view -c $tmp_bam_file )  ## number of unique mapped reads
+    #rm $tmp_bam_file
+    
+    ## alternatively
+    total_uniq_mapped=$( ${SAMTOOLS_PATH}/samtools view -q 1 -@ $ncore -f $flag0 ${input_pre}.bam | grep -v XA: | wc -l )
+else
+    ${SAMTOOLS_PATH}/samtools view -@ $ncore -q 5 -f $flag0 ${input_pre}.bam > $tmp_sam_file
+    total_uniq_mapped=$( grep -E "@|NM:" $tmp_sam_file | grep -v "XS:" | wc -l )
+    rm $tmp_sam_file
 fi
-
-
 total_uniq_mapped=$((${total_uniq_mapped}/2))
 
 total_pairs=$(grep 'paired in' ${output_pre}.flagstat.txt | cut -d ' ' -f1) 
@@ -57,8 +69,6 @@ total_mito=$((${total_mito_mapped}/2 + ${total_mito_unmapped}/2))
 total_mito_mapped=$((${total_mito_mapped}/2))
 total_dups=$(grep 'duplicates' ${output_pre}.flagstat.txt | cut -d ' ' -f1)
 total_dups=$((${total_dups}/2))
-
-
 
 total_pairs_MAPQH=$(grep 'with itself and mate mapped'  ${output_pre}.MAPQ${MAPQ}.flagstat.txt | cut -d ' ' -f1)
 total_pairs_MAPQH=$((${total_pairs_MAPQH}/2)) 
@@ -81,12 +91,7 @@ echo "Total_Uniq_Mapped    $total_uniq_mapped" >> ${output_pre}.MappingStats
 echo "Total_Mito_Mapped    $total_mito_mapped" >> ${output_pre}.MappingStats 
 echo "Total_Dups    $total_dups" >> ${output_pre}.MappingStats 
 
-
 echo "Total_Pairs_MAPQ${MAPQ}    $total_pairs_MAPQH" >> ${output_pre}.MappingStats 
 echo "Total_Mito_MAPQ${MAPQ}    $total_mito_MAPQH" >> ${output_pre}.MappingStats 
 echo "Total_Dups_MAPQ${MAPQ}    $total_dups_MAPQH" >> ${output_pre}.MappingStats 
-
-rm $tmp_sam_file
-
-
 

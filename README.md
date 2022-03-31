@@ -14,7 +14,7 @@ A comprehensive workbench for single cell ATAC-seq data processing, analysis and
       * [Dependencies](#dependencies)
          * [Programming language users should install](#programming-language-users-should-install)
          * [Software packages required](#software-pacakges-required)
-      * [Quick start guide](#quick-start-guide)
+      * [One command for many](#one-command-for-many)
       * [Step by step guide to running scATAC-pro](#step-by-step-guide-to-running-scATAC-pro)
       * [Detailed usage](#detailed-usage)
       * [Run scATAC-pro through docker or singularity](#run-scATAC-pro-through-docker-or-singularity)
@@ -36,8 +36,8 @@ scATAC-pro consists of two units, the data processing unit and the downstream an
 Installation
 ------------
 
--   Note: It is not necessary to install scATAC-pro from scratch. You can use the docker or singularity version if you prefer (see [Run scATAC-pro through docker or singularity](#run-scATAC-pro-through-docker-or-singularity) )
--   Run the following command in your terminal, scATAC-pro will be installed in YOUR\_INSTALL\_PATH/scATAC-pro\_1.3.0
+-   Note: It is not necessary to install scATAC-pro from scratch. You can use the docker or singularity version if your system support (see [Run scATAC-pro through docker or singularity](#run-scATAC-pro-through-docker-or-singularity) )
+-   Run the following command in your terminal, scATAC-pro will be installed in YOUR\_INSTALL\_PATH/scATAC-pro\_1.4.4
 
 <!-- -->
 
@@ -49,23 +49,17 @@ Installation
 Updates
 ------------
 - Now provide [scATAC-pro tutorial in R](https://scatacpro-in-r.netlify.app/index.html) for access QC metrics and perform downstream analysis
-- Current version: 1.3.0
-- Recent updates
-    * *qc_per_barcode*: add tss enrichment score per cell into the QC metrics
-    * *call_cell*: enable filtering barcodes with minimal tss enrichment score cutoff (parameter **min_tss_escore** in the updated [configure_user.txt](configure_user.txt) file)
-    * fragments file indexed by tabix (named fragments.tsv.gz)
-    * *footprint* module: suppoort comparison of any two sets of cell clusters
-    * *motif_analysis* and *runDA*: enable seurat/matrix object in .rds format as input
-    * *integrate*: rename cell name for each sample to avoid shared barcodes among samples; enable a distance parameter to merge peaks
-    * *integrate_mtx*: new module added, as an alias of previous *integrate_seu* module
-    * Added *addCB2bam* module to write cell barcode into 
-      an additional column of the bam file 
-    * added qc per cell to metadata of the seurat object 
-      frac.tss, frac.promoter, and frac.enhancer, tss_enrich_score
+- Current version: 1.4.4
+- Highlighted updates
+    * **New module *reprocess_cellranger_output* added, to reprocess 10x scATAC-seq data (including atac in 10x multiome assay) originally processed by cellranger, taking cellranger processed .bam and .fragments.tsv.gz files as input (v1.4.3)**
+    * More friendly to single-end sequencing data (v1.4.2)
+    * New module *labelTransfer* added, to do label trasfer (for cell annotation) from cell annotation of scRNA-seq data. First construct a gene by cell activity matrix, then use *FindTransferAnchors* and *TransferData* function from Seurat R package to predicted cell type annotation from the cell annotaiton in scRNA-seq data (v1.4.0)
+    * New module *rmDoublets* added,to remove potential doublets using [DoubletFinder](https://github.com/chris-mcginnis-ucsf/DoubletFinder) algorithm (v1.3.1)
+    * *footprint* module: support comparison of any two sets of cell clusters (v1.3.0)
     * *integrate*: add VFACS (Variable Features Across ClusterS) option for the integration module,
-      **which reselect variable features across cell clusters after an initial clustering, followed by 
-        another round of dimension reduction and clustering**, specify *Integrate_By = VFACS* in configure file
-       remove rare peaks (accessible in less than 1% of cells) from the variable features list
+      **which reselect highly variable features across cell clusters after an initial clustering, followed by 
+        another round of dimension reduction and clustering**, specify *Integrate_By = VFACS* in configure file,
+        rare peaks (accessible in less than 1% of cells) were also removed from the highly variable features list (v1.1.2).
 - Complete update history can be viewd [here](complete_update_history.md)
 
 
@@ -99,29 +93,32 @@ Dependencies
 -   trim\_galore (&gt;=0.6.3), Trimmomatic (&gt;=0.6.3)
 -   Regulratory Genomics Toolbox (RGT, for footprinting analysis)
 -   g++ compiler, bzip2, ncurses-devel
--   R packaages: devtools, flexdashboard, png, data.table, Matirx, Rcpp, ggplot2, flexmix, optparse, magrittr, readr, Seurat, bedr, gridExtra, ggrepel, kableExtra, viridis, xlsx, RColorBrewer,pheatmap,motifmatchr, chromVAR, chromVARmotifs, SummarizedExperiment, BiocParallel, DESeq2, clusterProfiler, BSgenome.Hsapiens.UCSC.hg38, BSgenome.Mmusculus.UCSC.mm10, VisCello.atac
+-   R packaages: devtools, flexdashboard, png, data.table, Matirx, Rcpp, ggplot2, flexmix, optparse, magrittr, readr, Seurat, bedr, gridExtra, ggrepel, kableExtra, viridis, xlsx, RColorBrewer,pheatmap,motifmatchr, chromVAR, chromVARmotifs, SummarizedExperiment, BiocParallel, DESeq2, clusterProfiler, BSgenome.Hsapiens.UCSC.hg38, BSgenome.Mmusculus.UCSC.mm10, EnsDb.Hsapiens.v86, EnsDb.Mmusculus.v79, VisCello.atac
 
-Quick start guide
+One command for many
 -----------
 
--   **IMPORTANT**: The parameters and options should be specified in a configurartion file in plain text format. Copy and edit the configure\_user.txt file in this repository and then in your terminal run the following commands:
+-   **Input**: 
+    -   fastq files for pair-end1 reads(pe1_fastq.gz), pair-end2 reads(pe2_fastq_gz) and cell barcords (index_fastq.gz) 
 
-- **NOTE**: some large mapping index and genome annotation files can be downloaded [here](https://chopri.box.com/s/dlqybg6agug46obiu3mhevofnq4vit4t)
+    -   **for data generated by 10x, you can just speficy the path to each FASTQ files folder per sample**
 
-- To access QC metrics and perform downstream analysis in R, see [scATAC-pro tutorial in R](https://scatacpro-in-r.netlify.app/index.html) 
+-   **IMPORTANT**: The parameters and options should be specified in a configurartion file in plain text format. Copy and edit the *configure\_user.txt* file in this repository and then in your terminal run the following commands:
 
 ```
     $ scATAC-pro -s process 
-                 -i pe1_fastq,pe2_fastq,index_fastq 
+                 -i pe1.fastq.gz,pe2.fastq.gz,index.fastq.gz(,other_index_fastq.gz) 
                  -c configure_user.txt 
 
     $ scATAC-pro -s downstream 
                  -i output/filtered_matrix/PEAK_CALLER/CELL_CALLER/matrix.mtx (or matrix.rds) 
                  -c configure_user.txt
+
     ## PEAK_CALLER and CELL_CALLER is specified in your configure_user.txt file
+
 ```
 
--   If fastq files are generated using 10x genomics platform, you can just specify the path to fastq folder for each sample as
+-   If fastq files are generated using 10x genomics platform, you can just specify the path to fastq folder for a sample:
 
 ```
     $ scATAC-pro -s process 
@@ -131,44 +128,48 @@ Quick start guide
 
 -   For data processing, if fastq files have been demultiplexed as the required format with the barcode recorded in the name of each read as @barcode:ORIGIN\_READ\_NAME , you can skip the demultiplexing step by running the following command:
 
-
+```
     $ scATAC-pro -s process_no_dex 
                  -i pe1_fastq,pe2_fastq
                  -c configure_user.txt 
+```
 
--   The **output** will be saved under ./output as default
--   --verbose (or -b) will print the running message on screen, otherwise the message will only be saved under output/logs/MODULE.txt
+-   To reprocess data originally processed by cellranger:
+
+```
+    $ scATAC-pro -s reprocess_cellranger_output
+                 -i cellranger_generated.bam_file,cellranger_generated_fragments.tsv.gz_file
+                 -c configure_user.txt
+
+```
+
+- **NOTE**: 
+  - Some large mapping index and genome annotation files can be downloaded [here](https://chopri.box.com/s/dlqybg6agug46obiu3mhevofnq4vit4t)
+  - The **output** will be saved under ./output as default
+  - --verbose (or -b) will print the running message on screen, otherwise the message will only be saved under output/logs/MODULE.txt
+  - To access QC metrics and perform downstream analysis in R, see [scATAC-pro tutorial in R](https://scatacpro-in-r.netlify.app/index.html) 
 
 
 Step by step guide to running scATAC-pro
 ---------------------------
 
 -   **IMPORTANT**: you can run scATAC-pro sequentially. The input of a later analysis module is the output of the previous analysis modules. The following tutorial uses fastq files downloaded from [PBMC10k 10X Genomics](https://support.10xgenomics.com/single-cell-atac/datasets/1.1.0/atac_v1_pbmc_10k?) 
-
--   *Combine data from different sequencing lanes*
-
-    $ cat pbmc_fastqs/atac_pbmc_10k_v1_S1_L001_R1_001.fastq.gz pbmc_fastqs/atac_pbmc_10k_v1_S1_L002_R1_001.fastq.gz > pe1_fastq.gz
-
-    $ cat pbmc_fastqs/atac_pbmc_10k_v1_S1_L001_R3_001.fastq.gz pbmc_fastqs/atac_pbmc_10k_v1_S1_L002_R3_001.fastq.gz > pe2_fastq.gz
-
-    $ cat pbmc_fastqs/atac_pbmc_10k_v1_S1_L001_R2_001.fastq.gz pbmc_fastqs/atac_pbmc_10k_v1_S1_L002_R2_001.fastq.gz > index_fastq.gz
-
--   *Run scATAC-pro sequentially*
+    
+-   <u>Run scATAC-pro sequentially (specify PEAK_CALLER = MACS2 and CELL_CALLER = FILTER or other values in the configure_user.txt file) </u>
 
 ```
     $ scATAC-pro -s demplx_fastq 
-                 -i pe1_fastq.gz,pe2_fastq.gz,index_fastq.gz 
+                 -i pe1_fastq.gz,pe2_fastq.gz,index_fastq.gz(,other_index_fastq.gz, ...) 
                  -c configure_user.txt 
-    # or
+    # or for 10x data
     $ scATAC-pro -s demplx_fastq 
-                 -i pbmc_fastqs/ 
+                 -i pbmc_10x_fastqs/ 
                  -c configure_user.txt 
 
     $ scATAC-pro -s trimming 
                  -i output/demplxed_fastq/pbmc10k.demplxed.PE1.fastq.gz,
                     output/demplxed_fastq/pbmc10k.demplxed.PE2.fastq.gz
                  -c configure_user.txt 
-
 
     $ scATAC-pro -s mapping 
                   -i output/trimmed_fastq/pbmc10k.trimmed.demplxed.PE1.fastq.gz,
@@ -184,11 +185,11 @@ Step by step guide to running scATAC-pro
                  -c configure_user.txt 
                  
     $ scATAC-pro -s get_mtx 
-                 -i output/summary/pbmc10k.fragments.tsv.gz,output/peaks/MACS2/pbmc10k_features_BlacklistRemoved.bed 
+                 -i output/summary/pbmc10k.fragments.tsv.gz,output/peaks/PEAK_CALLER/pbmc10k_features_BlacklistRemoved.bed 
                  -c configure_user.txt 
 
     $ scATAC-pro -s qc_per_barcode 
-                 -i output/summary/pbmc10k.fragments.tsv.gz,output/peaks/MACS2/pbmc10k_features_BlacklistRemoved.bed 
+                 -i output/summary/pbmc10k.fragments.tsv.gz,output/peaks/PEAK_CALLER/pbmc10k_features_BlacklistRemoved.bed 
                  -c configure_user.txt
 
     $ scATAC-pro -s call_cell
@@ -202,21 +203,24 @@ Step by step guide to running scATAC-pro
     
     ## after running the above module, you can run module report (list below)
     ## to generate first page of the summary report
+    $ scATAC-pro -s rmDoublets
+                 -i output/filtered_matrix/PEAK_CALLER/CELL_CALLER/matrix.rds,0.03 (0.03 is the default expected fraction of doublets ) 
+                 -c configure_user.txt
 
     $ scATAC-pro -s clustering
-                 -i output/filtered_matrix/PEAK_CALLER/CELL_CALLER/matrix.mtx (or matrix.rds ) 
+                 -i output/filtered_matrix/PEAK_CALLER/CELL_CALLER/matrix.rds (or a seurat.rds file ) 
                  -c configure_user.txt
 
     $ scATAC-pro -s motif_analysis
-                 -i output/filtered_matrix/PEAK_CALLER/CELL_CALLER/matrix.mtx (or matrix.rds) 
+                 -i output/filtered_matrix/PEAK_CALLER/CELL_CALLER/matrix.rds (or matrix.mtx) 
                  -c configure_user.txt
                  
     $ scATAC-pro -s split_bam
                  -i output/downstream_analysis/PEAK_CALLER/CELL_CALLER/cell_cluster_table.tsv
                  -c configure_user.txt
 
-    $ scATAC-pro -s footprint ## supporting comparison two clusters, and one-vs-rest
-                 -i 0,1  ## or '0,rest' (means cluster1 vs rest) or 'one,rest' (all one-vs-rest)
+    $ scATAC-pro -s footprint ## supporting comparison two groups of cell clusters, and one-vs-rest
+                 -i 0,1  ## or '0:3,1:2' (group1 consist of cluster0,3, and group2 for cluster1,2)) or 'one,rest' (all one-vs-rest comparison)
                  -c configure_user.txt
                  
     $ scATAC-pro -s runCicero
@@ -237,7 +241,7 @@ Step by step guide to running scATAC-pro
                  
     ## merge peaks that are within 500bp distance of each other            
     $ scATAC-pro -s mergePeaks
-                 -i peak_file1,peak_file2,(peak_file3...),500
+                 -i peak_file1,peak_file2,...,peak_fileN,500
                  -c configure_user.txt
 
     ## reconstruct matrix using given new peak file
@@ -251,14 +255,22 @@ Step by step guide to running scATAC-pro
     ## the integration methods includes 'VFACS', 'pool', 'seurat', and 'harmony', for instance, 
     ## you can specify the integration method with 'Integrate_By = VFACS' in the configure file
     $ scATAC-pro -s integrate
-                 -i peak_file1,peak_file2,(peak_file3...)   ## 
+                 -i peak_file1,peak_file2,...,peak_fileN,500 
                  -c configure_user.txt
     
     ## if you have the reconstructed matrix for data set (meaning using the merged peaks)
     ## you can run the *integrate_mtx* whtich is second part of the module *integrate*            
 
     $ scATAC-pro -s integrate_mtx
-                 -i mtx_file1,mtx_file2,(mtx_file3...)   
+                 -i reconstructed_mtx_file1,reconstructed_mtx_file2,(reconstructed_mtx_file3...)   
+                 -c configure_user.txt
+
+
+    ## label transfer (cell annotation) from scRNA-seq
+    ## cell annotated with metadata 'Cell_Type' in seurat obj of scRNA-seq data
+    ## the gtf_file is optional
+    $ scATAC-pro -s labelTransfer
+                 -i seurat_obj_atac.rds,seurat_obj_rna.rds(,gtf_file)   
                  -c configure_user.txt
 ```
 
@@ -284,11 +296,13 @@ cello('output/downstream_analysis/PEAK_CALLER/CELL_CALLER/VisCello_obj') ## laun
 Detailed Usage
 --------------
 
+See [here](https://scatacpro-in-r.netlify.app/note_module) or in your terminal:
+
     $ scATAC-pro --help
     usage : scATAC-pro -s STEP -i INPUT -c CONFIG [-o] [-h] [-v]
     Use option -h|--help for more information
 
-    scATAC-pro 1.3.0
+    scATAC-pro 1.4.4
     ---------------
     OPTIONS
 
@@ -348,8 +362,11 @@ Detailed Usage
           process_with_bam: processing from bam file
                                 input: bam file for aggregated data, outputted from the mapping module 
                                 output: filtered peak-by-cell matrix and all intermediate results 
+          rmDoublets: remove potential doublets
+                         input: a peak-by-cell matrix file or a seurat object file in .rds format
+                         output: doublets removed  matrix.rds and barcodes.txt file and seurat objects w/ and w/o doublets saved in the input directory (and a umap plot colored by singlet/doubet) 
           clustering: cell clustering
-                               input: filtered peak-by-cell matrix file, outputted from the call_cell module
+                               input: filtered peak-by-cell matrix file, outputted from the call_cell module (or a seurat.rds file)
                                output: seurat objects with clustering label in the metadata (.rds file) and 
                                        barcodes with cluster labels (cell_cluster_table.tsv file), and umap plot colorred
                                        clustering label, saved in output/downstream_analysiss/PEAK_CALLER/CELL_CALLER/
@@ -417,11 +434,25 @@ Detailed Usage
           visualize: interactively visualize the data through VisCello
                          input: VisCello_obj directory, outputted from the clustering module
                          output: launch VisCello through web browser for interactively visualization"
+
           addCB2bam: add cell barcode tag to bam file
                          input: a bam file generated by scATAC-pro
                          output: the bam file with column 'CB:Z:cellbarcode' added (saved in the same directory as
                                  the input bam file)
-
+      
+          labelTransfer: label transfer (cell annotation) from scRNA-seq data
+                         input: paths for a seurat object for scATAC-seq, a seurat object for scRNA-seq data in .rds format,
+                                and an optional .gtf file for gene annotation, separated by a comma. 
+                         output: a updated seurat object for atac with the Predicted_Cell_Type as a metadata variable and
+                                 an umap plot colored by Predicted_Cell_Type, saved in the same directory as the input atac
+                                 seurat object.
+                         NOTE: the cell annotation should be given as a metadata of the seurat object of
+                               scRNA-seq. Both seurat objects should have pca and umap dimemsion reduction 
+                               done.
+          reprocess_cellreanger_output: re-process cellranger results 
+                         input: cellranger_bam_file,cellranger_fragments.tsv.gz
+                         output: all outputs of in data processing steps
+        
        -i|--input INPUT : input data, different types of input data are required for different analysis
        -c|--conf CONFIG : configuration file for parameters (if exist) for each analysis module
        [-o|--output_dir : folder to save results, default output/ under the current directory; sub-folder will be created automatically for each analysis
@@ -430,15 +461,11 @@ Detailed Usage
        [-b|--verbose]: print running message on screen
 
 
-
-
 Run scATAC-pro through docker or singularity
 ----------------------------------
-In case you have problem in installing dependencies, you can run scATAC-pro without installing dependencies in **one of** the following ways:
+In case you have problem in installing dependencies, you can run scATAC-pro without installing dependencies as following:
 
-1. Run the pre-built docker version, pull the docker image [here](https://hub.docker.com/r/wbaopaul/scatac-pro) (not recommended because some module like *mapping* need a large memory which the docker container does not have) 
-
-2. Run it through singularity (which is more friendly with high performance cluster or HPC, and linux server) by running the following command:
+1. Pull the docker image [here](https://hub.docker.com/r/wbaopaul/scatac-pro), and run it through singularity (which is more friendly with high performance cluster or HPC, and linux server) by running the following commands:
 
 ```
 $ singularity pull -F docker://wbaopaul/scatac-pro:latest 
@@ -448,35 +475,32 @@ $ singularity exec --bind YOUR_BIND_PATH -H YOUR_WORK_PATH --cleanenv scatac-pro
 
 ```
 
-3. To use it on HPC cluster:
+2. More commonly, use it on a HPC cluster, here is an example script for running mapping step in my case (please change the file paths to yours): 
+  - write a script mapping.sh with something essially like this:
 
 ```
-# write a script mapping.sh for mapping as an example:
 #!/bin/bash
 module load singularity ## load singularity in your system
 
-singularity pull -F docker://wbaopaul/scatac-pro:latest  ## you just need run this line once
-## will generate scatac-pro_latest.sif in the current directory
+## pull the docker image
+## generating scatac-pro_latest.sif in your current directory
+singularity pull -F docker://wbaopaul/scatac-pro:latest  ## just need run this line once
 
 singularity exec --bind /mnt/isilon/ --cleanenv -H /mnt/isilon/tan_lab/yuw1/run_scATAC-pro/PBMC10k scatac-pro_latest.sif \ 
 scATAC-pro -s mapping -i fastq_PE1_file,fastq_PE2_file -c configure_user.txt
 
-# and then sumbit your job on HPC (e.g. qsub or sbatch mapping.sh)
-
 ```
+  - then sumbit your job on your HPC (e.g. qsub or sbatch mapping.sh)
 
-- **NOTE**: YOUR_WORK_PATH is your working directory, where the outputs will be saved 
+  - **NOTE**: 
+    - YOUR_WORK_PATH is your working directory, where the outputs will be saved 
 
-- **NOTE**: All inputs including data paths specified in configure_user.txx should be accessible under YOUR_BIND_PATH
+    - All inputs including data paths specified in configure_user.txt should be accessible under YOUR_BIND_PATH
 
-- **NOTE**: if running the *footprint* module, remember to download the reference data [rgtdata](https://chopri.box.com/s/dlqybg6agug46obiu3mhevofnq4vit4t) folder into YOUR_WROK_PATH
-
-
-
+    - NOTE: if running the *footprint* module, remember to download the reference data [rgtdata](https://chopri.box.com/s/dlqybg6agug46obiu3mhevofnq4vit4t) folder into YOUR_WROK_PATH
 
 [Access QC in R](https://scatacpro-in-r.netlify.app/qc_in_r)
 ---------------------------------------
-
 
 [Downstream Analysis in R](https://scatacpro-in-r.netlify.app/downstream_in_r)
 --------------------------------------

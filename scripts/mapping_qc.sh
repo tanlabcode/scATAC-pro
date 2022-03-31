@@ -32,20 +32,27 @@ fi
 ${SAMTOOLS_PATH}/samtools flagstat -@ $ncore ${input_pre}.positionsort.MAPQ${MAPQ}.bam > ${output_pre}.MAPQ${MAPQ}.flagstat.txt
 ${SAMTOOLS_PATH}/samtools idxstats -@ $ncore ${input_pre}.positionsort.MAPQ${MAPQ}.bam > ${output_pre}.MAPQ${MAPQ}.idxstat.txt
 
-
-tmp_sam_file=${output_dir}/tmp.sam
-${SAMTOOLS_PATH}/samtools view -@ $ncore -q 5 -f 0x2 ${input_pre}.positionsort.bam > $tmp_sam_file
-
-if [ $MAPPING_METHOD == 'bwa' ]; then
-   total_uniq_mapped=$( wc -l ${tmp_sam_file} | cut -d ' ' -f1 )  ## number of unique mapped reads
-elif [ $MAPPING_METHOD == 'bowtie' ]; then
-   total_uniq_mapped=$( grep -E "@|NM:" $tmp_sam_file | grep -v "XS:" | wc -l )
-else 
-   total_uniq_mapped=$( grep -E "@|NM:" $tmp_sam_file | grep -v "XS:" | wc -l )
+flag0=0x2
+if [ ${isSingleEnd} = 'TRUE' ]; then
+    flag0=0x1
 fi
 
+tmp_sam_file=${output_dir}/tmp.sam
+tmp_bam_file=${output_dir}/tmp.bam
 
-total_uniq_mapped=$((${total_uniq_mapped}/2))
+if [ $MAPPING_METHOD == 'bwa' ]; then
+    #${SAMTOOLS_PATH}/samtools view -@ $ncore -q 5 -f $flag0 -b ${input_pre}.positionsort.bam > $tmp_bam_file
+    #total_uniq_mapped=$( ${SAMTOOLS_PATH}/samtools view -c $tmp_bam_file )  ## number of unique mapped reads
+    #rm $tmp_bam_file
+   
+    ## alternatively
+    total_uniq_mapped=$( ${SAMTOOLS_PATH}/samtools view -q 1 -@ $ncore -f $flag0 ${input_pre}.positionsort.bam | grep -v XA: | wc -l )
+else
+    ${SAMTOOLS_PATH}/samtools view -@ $ncore -q 5 -f $flag0 ${input_pre}.positionsort.bam > $tmp_sam_file
+   total_uniq_mapped=$( grep -E "@|NM:" $tmp_sam_file | grep -v "XS:" | wc -l )
+    rm $tmp_sam_file
+fi
+   total_uniq_mapped=$((${total_uniq_mapped}/2))
 
 total_pairs=$(grep 'paired in' ${output_pre}.flagstat.txt | cut -d ' ' -f1) 
 total_pairs=$((${total_pairs}/2)) 
@@ -86,7 +93,6 @@ echo "Total_Pairs_MAPQ${MAPQ}    $total_pairs_MAPQH" >> ${output_pre}.MappingSta
 echo "Total_Mito_MAPQ${MAPQ}    $total_mito_MAPQH" >> ${output_pre}.MappingStats 
 echo "Total_Dups_MAPQ${MAPQ}    $total_dups_MAPQH" >> ${output_pre}.MappingStats 
 
-rm $tmp_sam_file
 
 
 

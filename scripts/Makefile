@@ -354,6 +354,36 @@ addCB2bam: config_check
 	@echo 
 
 #######################################
+## rmDoublets
+#######################################
+rmDoublets: config_check
+	@echo "--------------------------------------------" 
+	@date 
+	@echo "finding doublets..." 
+	@$(SCRIPTS)/rmDoublets.sh $(INPUT_FILE) $(CONFIG_FILE) $(CONFIG_SYS)
+	@echo 
+
+#######################################
+## labelTransfer
+#######################################
+labelTransfer: config_check
+	@echo "--------------------------------------------" 
+	@date 
+	@echo "label transfer from scRNA-seq..." 
+	@$(SCRIPTS)/labelTransfer.sh $(INPUT_FILE) $(CONFIG_FILE) $(CONFIG_SYS)
+	@echo 
+
+#######################################
+## reprocess_cellranger_output
+#######################################
+reprocess_cellranger_output: config_check
+	@echo "--------------------------------------------" 
+	@date 
+	@echo "reprocess data processed by cellranger-atac..." 
+	@$(SCRIPTS)/reprocess_cellranger_output.sh $(INPUT_FILE) $(CONFIG_FILE) $(CONFIG_SYS)
+	@echo 
+
+#######################################
 ## all
 #######################################
 all: config_check

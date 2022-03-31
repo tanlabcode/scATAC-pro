@@ -1,4 +1,27 @@
 ## Complete Update History
+- Version 1.4.4 released
+    * Only consider standard chromosomes in the *qc_per_barcode* module 
+    * Correct a minor bug in the *qc_per_barcode* module
+    * Add version# in the html report
+    * Clean and correct a minor bug in the *trimming* module
+- Version 1.4.3 released
+    * add new module *reprocess_cellranger_output* to reprocess scATAC-seq data originally processed by cellranger 
+- Version 1.4.2 released
+    * correct bugs in processing single-end sequencing data
+    * correct minor underestimate of overall FrIP in the qc *report*
+    * correct a bug in *process_with_bam* module
+    * correct a bug in *integrate* module
+- Version 1.4.1 released
+    * *qc_per_barcode*: add tss enrichment score per cell into the QC metrics
+    * update tutorial
+    * correct a bug relate to input filepath for report module 
+    * record input file paths for the *integration* module
+    * using BAMPE for macs2 for paired-end sequencing
+- Version 1.4.0 released 
+    * new module added: labelTransfer (for cell annotation) from scRNA-seq
+- Version 1.3.1 released
+    * *rmDoublets*: a new module added, to remove doublets
+    * *clustering*: accepts seurat obj (in .rds format) as input as well
 - Version 1.3.0 released
     * *qc_per_barcode*: add tss enrichment score per cell into the QC metrics
     * *call_cell*: enable filtering barcodes by tss enrichment score

@@ -3,7 +3,7 @@
 library(data.table)
 library(Rcpp)
 library(Matrix)
-
+library(GenomicRanges)
 
 
 #sourceCpp(paste0('getOverlaps.cpp'))
@@ -109,6 +109,7 @@ sourceCpp(code='
 )
 
 
+
 args = commandArgs(T)
 frags.file = args[1]
 peaks.file = args[2]
@@ -121,26 +122,35 @@ frags = fread(frags.file, select=1:4, header = F)
 names(frags) = c('chr', 'start', 'end', 'bc')
 setkey(frags, chr, start)
 
+## only keep reads in standard chrs
+chrs = standardChromosomes(makeGRangesFromDataFrame(frags))
+frags = frags[chr %in% chrs]
 frags[, 'total_frags' := .N, by = bc]
 frags = frags[total_frags > 5]
 
-frags = frags[!grepl(chr, pattern = 'random', ignore.case = T)]
-frags = frags[!grepl(chr, pattern ='un', ignore.case = T)]
+#frags = frags[!grepl(chr, pattern = 'random', ignore.case = T)]
+#frags = frags[!grepl(chr, pattern ='un', ignore.case = T)]
 
 peaks = fread(peaks.file, select=1:3, header = F)
-promoters = fread(promoters.file, select=1:3, header = F)
 tss = fread(tss.file, select=1:3, header = F)
-enhs = fread(enhs.file, select=1:3, header = F)
-names(peaks) = names(promoters) = names(tss) =
-  names(enhs) = c('chr', 'start', 'end')
+names(peaks) = names(tss) = c('chr', 'start', 'end')
 
+## promoters.file and enhs.file are optional
+if(file.exists(promoters.file)) {
+    promoters = fread(promoters.file, select=1:3, header = F)
+    names(promoters) =  c('chr', 'start', 'end')
+    setkey(promoters, chr, start)
+}
+if(file.exists(enhs.file)) {
+    enhs = fread(enhs.file, select=1:3, header = F)
+    names(enhs) =  c('chr', 'start', 'end')
+    setkey(enhs, chr, start)
+}
 
 setkey(peaks, chr, start)
-setkey(promoters, chr, start)
 setkey(tss, chr, start)
-setkey(enhs, chr, start)
 
-chrs = unique(frags$chr)
+#chrs = unique(frags$chr)
 
 ## calculate tss enrichment score
 if(T){
@@ -166,7 +176,7 @@ if(T){
     chrs0 = unique(frags0$chr)
     tss4escore0 = tss4escore[chr %in% chrs0]
     tss4escore0.left = tss4escore.left[chr %in% chrs0]
-    chrs = unique(frags0$chr)
+    #chrs = unique(frags0$chr)
     escores_chrs = NULL
     for(chr0 in chrs0){
       if(nrow(frags0[chr==chr0]) <= 50) next
@@ -187,10 +197,8 @@ tss[, 'end' := end + 1000]
 fragsInRegion = NULL
 for(chr0 in chrs){
   peaks0 = peaks[chr == chr0]
-  promoters0 = promoters[chr == chr0]
 
   tss0 = tss[chr == chr0]
-  enhs0 = enhs[chr == chr0]
   frags0 = frags[chr == chr0]
   frags = frags[chr != chr0]
   if(nrow(peaks0) == 0){
@@ -199,23 +207,30 @@ for(chr0 in chrs){
     frags0[, 'peaks' := getOverlaps_read2AnyRegion(frags0, peaks0)]
   }
   
-  if(nrow(promoters0) == 0){
-    frags0[, 'promoters' := 0]
-  }else{
-    frags0[, 'promoters' := getOverlaps_read2AnyRegion(frags0, promoters0)]
-  }
-  
   if(nrow(tss0) == 0){
     frags0[, 'tss' := 0]
   }else{
     frags0[, 'tss' := getOverlaps_read2AnyRegion(frags0, tss0)]
   }
-  
-  if(nrow(enhs0) == 0){
-    frags0[, 'enhs' := 0]
-  }else{
-    frags0[, 'enhs' := getOverlaps_read2AnyRegion(frags0, enhs0)]
+
+  if(file.exists(promoters.file)) {
+    promoters0 = promoters[chr == chr0]
+    if(nrow(promoters0) == 0){
+        frags0[, 'promoters' := 0]
+    }else{
+        frags0[, 'promoters' := getOverlaps_read2AnyRegion(frags0, promoters0)]
+    }
   }
+  
+  
+  if(file.exists(enhs.file)){ 
+    enhs0 = enhs[chr == chr0]
+    if(nrow(enhs0) == 0){
+        frags0[, 'enhs' := 0]
+    }else{
+        frags0[, 'enhs' := getOverlaps_read2AnyRegion(frags0, enhs0)]
+    }
+  } 
  
   
   fragsInRegion = rbind(fragsInRegion, frags0)
@@ -230,12 +245,22 @@ fragsInRegion[, 'frac_mito' := sum(isMito)/total_frags, by = bc]
 fragsInRegion[, 'isMito' := NULL]
 fragsInRegion[, 'frac_peak' := sum(peaks)/total_frags, by = bc]
 fragsInRegion[, 'peaks' := NULL]
-fragsInRegion[, 'frac_promoter' := sum(promoters)/total_frags, by = bc]
-fragsInRegion[, 'promoters' := NULL]
 fragsInRegion[, 'frac_tss' := sum(tss)/total_frags, by = bc]
 fragsInRegion[, 'tss' := NULL]
-fragsInRegion[, 'frac_enhancer' := sum(enhs)/total_frags, by = bc]
-fragsInRegion[, 'enhs' := NULL]
+
+if(file.exists(promoters.file)) {
+    fragsInRegion[, 'frac_promoter' := sum(promoters)/total_frags, by = bc]
+    fragsInRegion[, 'promoters' := NULL]
+}else{
+    fragsInRegion[, 'frac_promoter' := 0]
+}
+
+if(file.exists(enhs.file)) {
+    fragsInRegion[, 'frac_enhancer' := sum(enhs)/total_frags, by = bc]
+    fragsInRegion[, 'enhs' := NULL]
+}else{
+    fragsInRegion[, 'frac_enhancer' := 0]
+}
 fragsInRegion = unique(fragsInRegion)
 fragsInRegion$tss_enrich_score = escores[fragsInRegion$bc]
 

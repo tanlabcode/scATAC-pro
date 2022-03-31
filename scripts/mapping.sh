@@ -28,7 +28,7 @@ echo "Sorting bam file"
 ncore=$(nproc --all)
 ncore=$(($ncore - 1))
 mkdir -p ${mapRes_dir}/tmp
-${SAMTOOLS_PATH}/samtools sort -T ${mapRes_dir}/tmp/ -@ $ncore -n -o ${mapRes_dir}/${OUTPUT_PREFIX}.sorted.bam ${mapRes_dir}/${OUTPUT_PREFIX}.bam
+${SAMTOOLS_PATH}/samtools sort -m 2G -T ${mapRes_dir}/tmp/ -@ $ncore -n -o ${mapRes_dir}/${OUTPUT_PREFIX}.sorted.bam ${mapRes_dir}/${OUTPUT_PREFIX}.bam
 rm ${mapRes_dir}/${OUTPUT_PREFIX}.bam
 
 ## to mark duplicates
@@ -36,7 +36,7 @@ ${SAMTOOLS_PATH}/samtools fixmate -@ $ncore -m ${mapRes_dir}/${OUTPUT_PREFIX}.so
 rm ${mapRes_dir}/${OUTPUT_PREFIX}.sorted.bam
 
 # Markdup needs position order
-${SAMTOOLS_PATH}/samtools sort -@ $ncore -T ${mapRes_dir}/tmp/ -o ${mapRes_dir}/${OUTPUT_PREFIX}.positionsort0.bam ${mapRes_dir}/${OUTPUT_PREFIX}.fixmate.bam
+${SAMTOOLS_PATH}/samtools sort -m 2G -@ $ncore -T ${mapRes_dir}/tmp/ -o ${mapRes_dir}/${OUTPUT_PREFIX}.positionsort0.bam ${mapRes_dir}/${OUTPUT_PREFIX}.fixmate.bam
 rm ${mapRes_dir}/${OUTPUT_PREFIX}.fixmate.bam
 
 ## mark duplicates
@@ -49,12 +49,17 @@ ${SAMTOOLS_PATH}/samtools index -@ $ncore ${mapRes_dir}/${OUTPUT_PREFIX}.positio
 
 
 ## filtering low quality and/or deplicates for downstreame analysis
-${SAMTOOLS_PATH}/samtools view -f 0x2 -b -h -q 30 -@ $ncore ${mapRes_dir}/${OUTPUT_PREFIX}.positionsort.bam -o ${mapRes_dir}/${OUTPUT_PREFIX}.positionsort.MAPQ30.bam 
+flag0=0x2
+if [ ${isSingleEnd} = 'TRUE' ]; then
+    flag0=0x1
+fi
+
+${SAMTOOLS_PATH}/samtools view -f $flag0 -b -h -q 30 -@ $ncore ${mapRes_dir}/${OUTPUT_PREFIX}.positionsort.bam -o ${mapRes_dir}/${OUTPUT_PREFIX}.positionsort.MAPQ30.bam 
 ${SAMTOOLS_PATH}/samtools index -@ $ncore ${mapRes_dir}/${OUTPUT_PREFIX}.positionsort.MAPQ30.bam 
 
 
 if [ $MAPQ -ne 30 ]; then
-     ${SAMTOOLS_PATH}/samtools view -f 0x2 -b -h -q $MAPQ -@ $ncore ${mapRes_dir}/${OUTPUT_PREFIX}.positionsort.bam -o ${mapRes_dir}/${OUTPUT_PREFIX}.positionsort.MAPQ${MAPQ}.bam 
+     ${SAMTOOLS_PATH}/samtools view -f $flag0 -b -h -q $MAPQ -@ $ncore ${mapRes_dir}/${OUTPUT_PREFIX}.positionsort.bam -o ${mapRes_dir}/${OUTPUT_PREFIX}.positionsort.MAPQ${MAPQ}.bam 
 fi
 
 
@@ -69,7 +74,14 @@ bash ${curr_dir}/mapping_qc.sh ${mapRes_dir}  $2 $3
 echo "Simple mapping stats summary Done!"
 
 echo "Getting txt file for read pair (fragment) information"
-${PERL_PATH}/perl ${curr_dir}/src/simply_bam2frags.pl --read_file ${mapRes_dir}/${OUTPUT_PREFIX}.positionsort.MAPQ${MAPQ}.bam \
+
+bam2frag=simply_bam2frags.pl
+if [ ${isSingleEnd} = 'TRUE' ]; then
+    bam2frag=simply_bam2frags_singleEnd.pl
+fi
+
+
+${PERL_PATH}/perl ${curr_dir}/src/${bam2frag} --read_file ${mapRes_dir}/${OUTPUT_PREFIX}.positionsort.MAPQ${MAPQ}.bam \
         --output_file ${qc_dir}/${OUTPUT_PREFIX}.fragments.tsv --samtools_path $SAMTOOLS_PATH
 
 ${TABIX_PATH}/bgzip -f ${qc_dir}/${OUTPUT_PREFIX}.fragments.tsv.len 
@@ -81,7 +93,7 @@ ${R_PATH}/Rscript --vanilla ${curr_dir}/src/sort_frags.R ${qc_dir}/${OUTPUT_PREF
 ## index fragment file
 #sort -k1,1 -k2,2n -T ${mapRes_dir}/tmp/  ${qc_dir}/${OUTPUT_PREFIX}.fragments.tsv > ${qc_dir}/${OUTPUT_PREFIX}.fragments.sorted.tsv
 #mv ${qc_dir}/${OUTPUT_PREFIX}.fragments.sorted.tsv ${qc_dir}/${OUTPUT_PREFIX}.fragments.tsv
-${TABIX_PATH}/bgzip  ${qc_dir}/${OUTPUT_PREFIX}.fragments.tsv 
-${TABIX_PATH}/tabix -p bed ${qc_dir}/${OUTPUT_PREFIX}.fragments.tsv.gz
+${TABIX_PATH}/bgzip -f ${qc_dir}/${OUTPUT_PREFIX}.fragments.tsv 
+${TABIX_PATH}/tabix -f -p bed ${qc_dir}/${OUTPUT_PREFIX}.fragments.tsv.gz
 
 

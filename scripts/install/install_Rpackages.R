@@ -18,7 +18,7 @@ for(pk in pks){
 }
 
 bioc.pks = c('RColorBrewer','pheatmap','motifmatchr', 'chromVAR', 'SummarizedExperiment', 'BiocParallel', 'DESeq2', 'edgeR', 'matrixStats', 'cicero', 'farver', 'BSgenome.Hsapiens.UCSC.hg38', 'BSgenome.Mmusculus.UCSC.mm10',  'clusterProfiler',
- 'DropletUtils')
+ 'DropletUtils', 'EnsDb.Hsapiens.v86', 'EnsDb.Mmusculus.v79')
 
 for(pk in bioc.pks){
     if(!require(pk, character.only = T)) {  
@@ -43,4 +43,8 @@ if(!require(VisCello.atac)) {
 
 if(!require(countreg)) {
     install.packages("countreg", repos="http://R-Forge.R-project.org")
+}
+
+if(!require(DoubletFinder)) {
+    devtools::install_github('chris-mcginnis-ucsf/DoubletFinder', force = T, upgrade = 'never')
 }
