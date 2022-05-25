@@ -37,7 +37,7 @@ Installation
 ------------
 
 -   Note: It is not necessary to install scATAC-pro from scratch. You can use the docker or singularity version if your system support (see [Run scATAC-pro through docker or singularity](#run-scATAC-pro-through-docker-or-singularity) )
--   Run the following command in your terminal, scATAC-pro will be installed in YOUR\_INSTALL\_PATH/scATAC-pro\_1.4.4
+-   Run the following command in your terminal, scATAC-pro will be installed in YOUR\_INSTALL\_PATH/scATAC-pro\_1.5.0
 
 <!-- -->
 
@@ -49,8 +49,9 @@ Installation
 Updates
 ------------
 - Now provide [scATAC-pro tutorial in R](https://scatacpro-in-r.netlify.app/index.html) for access QC metrics and perform downstream analysis
-- Current version: 1.4.4
+- Current version: 1.5.0
 - Highlighted updates
+    * No annotation of peaks in seurat object from v1.5.0. The peaks are still annotated in modules *runDA*, *runGO* and *visualize*.
     * **New module *reprocess_cellranger_output* added, to reprocess 10x scATAC-seq data (including atac in 10x multiome assay) originally processed by cellranger, taking cellranger processed .bam and .fragments.tsv.gz files as input (v1.4.3)**
     * More friendly to single-end sequencing data (v1.4.2)
     * New module *labelTransfer* added, to do label trasfer (for cell annotation) from cell annotation of scRNA-seq data. First construct a gene by cell activity matrix, then use *FindTransferAnchors* and *TransferData* function from Seurat R package to predicted cell type annotation from the cell annotaiton in scRNA-seq data (v1.4.0)
@@ -208,11 +209,11 @@ Step by step guide to running scATAC-pro
                  -c configure_user.txt
 
     $ scATAC-pro -s clustering
-                 -i output/filtered_matrix/PEAK_CALLER/CELL_CALLER/matrix.rds (or a seurat.rds file ) 
+                 -i output/filtered_matrix/PEAK_CALLER/CELL_CALLER/matrix.rds (or a seurat_obj.rds file ) 
                  -c configure_user.txt
 
     $ scATAC-pro -s motif_analysis
-                 -i output/filtered_matrix/PEAK_CALLER/CELL_CALLER/matrix.rds (or matrix.mtx) 
+                 -i output/filtered_matrix/PEAK_CALLER/CELL_CALLER/matrix.rds (or matrix.mtx, or seurat_obj.rds file) 
                  -c configure_user.txt
                  
     $ scATAC-pro -s split_bam
@@ -239,9 +240,9 @@ Step by step guide to running scATAC-pro
                  -i output/summary
                  -c configure_user.txt
                  
-    ## merge peaks that are within 500bp distance of each other            
+    ## merge peaks with qvlue < 0.01 (be able to filtering by qvalue since v1.5.0) and within 500bp distance of each other            
     $ scATAC-pro -s mergePeaks
-                 -i peak_file1,peak_file2,...,peak_fileN,500
+                 -i peak_file1,peak_file2,...,peak_fileN,500,0.01
                  -c configure_user.txt
 
     ## reconstruct matrix using given new peak file
@@ -255,7 +256,7 @@ Step by step guide to running scATAC-pro
     ## the integration methods includes 'VFACS', 'pool', 'seurat', and 'harmony', for instance, 
     ## you can specify the integration method with 'Integrate_By = VFACS' in the configure file
     $ scATAC-pro -s integrate
-                 -i peak_file1,peak_file2,...,peak_fileN,500 
+                 -i peak_file1,peak_file2,...,peak_fileN,500,0.01 
                  -c configure_user.txt
     
     ## if you have the reconstructed matrix for data set (meaning using the merged peaks)
@@ -302,7 +303,7 @@ See [here](https://scatacpro-in-r.netlify.app/note_module) or in your terminal:
     usage : scATAC-pro -s STEP -i INPUT -c CONFIG [-o] [-h] [-v]
     Use option -h|--help for more information
 
-    scATAC-pro 1.4.4
+    scATAC-pro 1.5.0
     ---------------
     OPTIONS
 
@@ -356,7 +357,11 @@ See [here](https://scatacpro-in-r.netlify.app/note_module) or in your terminal:
                                        PATH_TO_10xfastqs_folder
                                 output: peak-by-cell matrix and all intermediate results 
           process_no_dex: processing data without demultiplexing
-                                input: demultiplexed fastq files for both reads and index, separated by comma like:
+                                input: demultiplexed fastq files for both reads, separated by a comma like:
+                                       fastq1,fastq2; 
+                                output: peak-by-cell matrix and all intermediate results 
+          process_from_align: processing data from the alignment step (including alignment step)
+                                input: demultiplexed and adapter trimmed fastq files for both reads, separated by a comma like:
                                        fastq1,fastq2; 
                                 output: peak-by-cell matrix and all intermediate results 
           process_with_bam: processing from bam file
@@ -371,7 +376,8 @@ See [here](https://scatacpro-in-r.netlify.app/note_module) or in your terminal:
                                        barcodes with cluster labels (cell_cluster_table.tsv file), and umap plot colorred
                                        clustering label, saved in output/downstream_analysiss/PEAK_CALLER/CELL_CALLER/
           motif_analysis: perform TF motif analysis
-                               input: filtered peak-by-cell matrix file, outputted from the call_cell module
+                               input: filtered peak-by-cell matrix file, outputted from the call_cell module, or the seurat_obj.rds file
+                                         outputted from clustering module
                                output: TF-by-cell enrichment matrix in chromVAR object, a table and heatmap indicating 
                                        TF enrichment for each cell cluster, saved in output/downstream_analysiss/
                                         PEAK_CALLER/CELL_CALLER/
@@ -412,10 +418,10 @@ See [here](https://scatacpro-in-r.netlify.app/note_module) or in your terminal:
                          input: bam file (position sorted) in 10x format
                          output: position sorted bam file in scATAC-pro format saved in output/mapping_result,
                                  mapping qc stat and fragment.txt files saved in output/summary/
-          mergePeaks: merge peaks (called from different data sets) if the distance is
-                            less than a given size in basepairs (200 if not specified) 
+          mergePeaks: merge peaks (called from different data sets) within a given distance (say 200bp), 
+                      filtering each peak by qvalue, 0.01 for instance 
                          input: peak files and a distance parameter separated by comma: 
-                                peakFile1,peakFile2,peakFile3,200
+                                peakFile1,peakFile2,...,peakFileN,200,0.01
                          output: merged peaks saved in file output/peaks/merged.bed
           reconstMtx: reconstruct peak-by-cell matrix given peak file, fragments.tsv.gz file, barcodes.txt and 
                       an optional path for reconstructed matrix 
@@ -425,7 +431,7 @@ See [here](https://scatacpro-in-r.netlify.app/note_module) or in your terminal:
                                  if reconstructMatrixPath not specified, a sub-folder reConstruct_matrix will be created
                                  under the same path as the input barcodes.txt file
           integrate: perform integration of two ore more data sets
-                           input: peak/feature files and a optional distance parameter separated by comma: peak_file1,peak_file2,200
+                           input: peak/feature files, a distance parameter and a qvalue cutoff separated by comma: peak_file1,peak_file2,...,peak_fileN,200,0.01
                            output: merged peaks, reconstructed matrix, integrated seurat obj and umap plot, saved in
                                    output/integrated/
           integrate_mtx: perform integration of two ore more data matrices given the reconstructed peak-by-cell matrix
